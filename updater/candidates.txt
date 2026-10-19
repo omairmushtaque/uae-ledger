@@ -1,0 +1,54 @@
+# name|url
+The National Business|https://www.thenationalnews.com/arc/outboundfeeds/rss/category/business/
+Gulf News Business|https://gulfnews.com/rss?path=/business
+Khaleej Times Business|https://www.khaleejtimes.com/rss/business
+Khaleej Times Property|https://www.khaleejtimes.com/rss/property
+Arabian Business|https://www.arabianbusiness.com/feed
+AGBI|https://www.agbi.com/feed/
+Zawya|https://www.zawya.com/en/rss
+Gulf Business|https://gulfbusiness.com/feed/
+Emirates 24/7 Business|https://www.emirates247.com/rss/business
+WAM Economy|https://www.wam.ae/en/rss/economy
+Arab News Economy|https://www.arabnews.com/rss.xml
+Al Arabiya English Business|https://english.alarabiya.net/tools/rss
+Al-Monitor|https://www.al-monitor.com/rss
+Middle East Eye|https://www.middleeasteye.net/rss
+Gulf Today Business|https://www.gulftoday.ae/rss/business
+Trade Arabia|https://www.tradearabia.com/rss
+Zawya Projects|https://www.zawya.com/en/projects/rss
+Construction Week ME|https://www.constructionweekonline.com/rss
+Arabian Gulf Business Insight|https://www.agbi.com/articles/feed/
+MEED|https://www.meed.com/rss
+Reuters Business|https://www.reutersagency.com/feed/?best-topics=business-finance
+Bloomberg Markets|https://feeds.bloomberg.com/markets/news.rss
+CNBC Finance|https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664
+CNBC World|https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100727362
+FT Middle East|https://www.ft.com/middle-east?format=rss
+Economic Times Gulf|https://economictimes.indiatimes.com/nri/gulf/rssfeeds/-2128816011.cms
+Gulf Business Property|https://gulfbusiness.com/category/property/feed/
+Fintech Futures|https://www.fintechfutures.com/feed/
+Wamda|https://www.wamda.com/feed
+MAGNiTT|https://magnitt.com/feed
+Entrepreneur ME|https://www.entrepreneur.com/en-ae/rss
+Fast Company ME|https://fastcompanyme.com/feed/
+Forbes Middle East|https://www.forbesmiddleeast.com/rss
+Dubai Media Office|https://www.mediaoffice.ae/en/rss
+Dubai Land Dept news|https://dubailand.gov.ae/en/rss
+Central Bank UAE|https://www.centralbank.ae/en/rss
+DFM news|https://www.dfm.ae/rss
+ADX news|https://www.adx.ae/rss
+Gulf Times Business|https://www.gulf-times.com/rss/business
+Oil Price|https://oilprice.com/rss/main
+Rigzone|https://www.rigzone.com/news/rss/rigzone_latest.aspx
+GNews UAE business|https://news.google.com/rss/search?q=UAE+business+when:2d&hl=en-AE&gl=AE&ceid=AE:en
+GNews Dubai economy|https://news.google.com/rss/search?q=Dubai+economy+when:2d&hl=en-AE&gl=AE&ceid=AE:en
+GNews Abu Dhabi finance|https://news.google.com/rss/search?q=Abu+Dhabi+finance+when:2d&hl=en-AE&gl=AE&ceid=AE:en
+GNews ADNOC|https://news.google.com/rss/search?q=ADNOC+when:2d&hl=en-AE&gl=AE&ceid=AE:en
+GNews DFM ADX stocks|https://news.google.com/rss/search?q=DFM+OR+ADX+stocks+when:2d&hl=en-AE&gl=AE&ceid=AE:en
+GNews Dubai property|https://news.google.com/rss/search?q=Dubai+property+market+when:2d&hl=en-AE&gl=AE&ceid=AE:en
+GNews UAE banks|https://news.google.com/rss/search?q=UAE+banks+when:2d&hl=en-AE&gl=AE&ceid=AE:en
+GNews UAE fintech startups|https://news.google.com/rss/search?q=UAE+fintech+OR+startup+funding+when:2d&hl=en-AE&gl=AE&ceid=AE:en
+GNews UAE central bank|https://news.google.com/rss/search?q=UAE+central+bank+OR+dirham+when:2d&hl=en-AE&gl=AE&ceid=AE:en
+Bing News UAE business|https://www.bing.com/news/search?q=UAE+business&format=rss
+Bing News Dubai finance|https://www.bing.com/news/search?q=Dubai+finance&format=rss
+GDELT UAE business|https://api.gdeltproject.org/api/v2/doc/doc?query=(UAE%20OR%20Dubai%20OR%20%22Abu%20Dhabi%22)%20(economy%20OR%20business%20OR%20bank%20OR%20stocks)%20sourcelang:english&mode=artlist&maxrecords=75&timespan=1d&format=json&sort=datedesc

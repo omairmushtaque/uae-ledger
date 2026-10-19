@@ -1,0 +1,42 @@
+{
+  "_note": "verified=true means the URL was confirmed from a public source. Others are best-known patterns; hub.py checks every feed on every run and skips dead ones. Edit freely.",
+  "outlet_weights": {
+    "the national": 3, "gulf news": 3, "khaleej times": 3, "arabian business": 3, "agbi": 3,
+    "zawya": 3, "reuters": 3, "bloomberg": 3, "financial times": 3, "wam": 3,
+    "emirates news agency": 3, "abu dhabi media office": 3, "cnbc": 2, "gulf business": 2,
+    "arab news": 2, "al arabiya english": 2, "emirates 24/7": 2, "gulf today": 2,
+    "trade arabia": 2, "wamda": 2, "construction week online": 2, "the arabian post": 1
+  },
+  "feeds": [
+    {"name": "The National", "url": "https://www.thenationalnews.com/arc/outboundfeeds/rss/category/business/?outputType=xml", "type": "rss", "verified": false},
+    {"name": "Gulf News", "url": "https://gulfnews.com/rss?path=/business", "type": "rss", "verified": false},
+    {"name": "Khaleej Times", "url": "https://www.khaleejtimes.com/rss/business", "type": "rss", "verified": false},
+    {"name": "Arabian Business", "url": "https://www.arabianbusiness.com/gcc/uae/feed", "type": "rss", "verified": true},
+    {"name": "AGBI", "url": "https://www.agbi.com/feed/", "type": "rss", "verified": false},
+    {"name": "Gulf Business", "url": "https://gulfbusiness.com/feed/", "type": "rss", "verified": false},
+    {"name": "Wamda", "url": "https://www.wamda.com/feed", "type": "rss", "filter": true, "verified": false},
+    {"name": "The Arabian Post", "url": "https://thearabianpost.com/feed/", "type": "rss", "filter": true, "verified": true},
+    {"name": "Abu Dhabi Media Office", "url": "https://www.mediaoffice.abudhabi/en/economy/rss/", "type": "rss", "verified": true},
+    {"name": "Abu Dhabi Media Office", "url": "https://www.mediaoffice.abudhabi/en/energy/rss/", "type": "rss", "verified": true},
+    {"name": "Abu Dhabi Media Office", "url": "https://www.mediaoffice.abudhabi/en/technology/rss/", "type": "rss", "verified": true},
+    {"name": "Abu Dhabi Media Office", "url": "https://www.mediaoffice.abudhabi/en/infrastructure/rss/", "type": "rss", "verified": true},
+
+    {"name": "Google News: UAE business", "url": "https://news.google.com/rss/search?q=UAE+business+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+    {"name": "Google News: Dubai economy", "url": "https://news.google.com/rss/search?q=Dubai+economy+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+    {"name": "Google News: Abu Dhabi finance", "url": "https://news.google.com/rss/search?q=Abu+Dhabi+finance+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+    {"name": "Google News: ADNOC", "url": "https://news.google.com/rss/search?q=ADNOC+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+    {"name": "Google News: DFM and ADX", "url": "https://news.google.com/rss/search?q=DFM+OR+ADX+stocks+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+    {"name": "Google News: Dubai property", "url": "https://news.google.com/rss/search?q=Dubai+property+market+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+    {"name": "Google News: UAE banks", "url": "https://news.google.com/rss/search?q=UAE+banks+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+    {"name": "Google News: UAE fintech and startups", "url": "https://news.google.com/rss/search?q=UAE+fintech+OR+startup+funding+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+    {"name": "Google News: UAE central bank", "url": "https://news.google.com/rss/search?q=UAE+central+bank+OR+dirham+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+    {"name": "Google News: UAE IPOs", "url": "https://news.google.com/rss/search?q=UAE+IPO+OR+listing+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+    {"name": "Google News: Sovereign funds", "url": "https://news.google.com/rss/search?q=Mubadala+OR+ADQ+OR+ADIA+OR+%22L%27imad%22+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+    {"name": "Google News: DIFC and ADGM", "url": "https://news.google.com/rss/search?q=DIFC+OR+ADGM+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+    {"name": "Google News: UAE trade and non-oil", "url": "https://news.google.com/rss/search?q=UAE+non-oil+OR+trade+OR+exports+when:2d&hl=en-AE&gl=AE&ceid=AE:en", "type": "rss", "outlet_from_source": true},
+
+    {"name": "Bing News: UAE business", "url": "https://www.bing.com/news/search?q=UAE+business&format=rss", "type": "rss", "outlet_from_source": true, "filter": true},
+    {"name": "Bing News: Dubai finance", "url": "https://www.bing.com/news/search?q=Dubai+finance&format=rss", "type": "rss", "outlet_from_source": true, "filter": true},
+    {"name": "GDELT: UAE business", "url": "https://api.gdeltproject.org/api/v2/doc/doc?query=(UAE%20OR%20Dubai%20OR%20%22Abu%20Dhabi%22)%20(economy%20OR%20business%20OR%20bank%20OR%20stocks)%20sourcelang:english&mode=artlist&maxrecords=75&timespan=1d&format=json&sort=datedesc", "type": "gdelt", "outlet_from_source": true, "filter": true}
+  ]
+}
