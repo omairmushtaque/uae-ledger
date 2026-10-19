@@ -221,7 +221,7 @@ def make_story(c, weights, now):
     age_h = (now - max(m["ts"] for m in c)) / 3600
     return dict(id=hashlib.sha1(canon(first["url"]).encode()).hexdigest()[:10], lead=pick(lead),
                 more=[pick(m) for m in sorted((m for m in ms if m is not lead), key=lambda m: -w(m))],
-                ts=max(m["ts"] for m in c), n=len(ms), score=len(ms) * 1.5 + 6 * math.exp(-age_h / 10),
+                ts=max(m["ts"] for m in c), n=len(ms), topic=tag(" ".join(m["title"] for m in c)), score=len(ms) * 1.5 + 6 * math.exp(-age_h / 10),
                 _titles=[m["title"] for m in c], _snips=[m["snippet"] for m in c if m["snippet"]])
 
 
@@ -317,28 +317,71 @@ def health_table(health):
 
 
 # ---------- 5. build the page ----------
-CSS = """:root{--bg:#f7f6f3;--ink:#1f1f1e;--mute:#787774;--line:#e4e2dd;--link:#1f6c9f;--chip:#edf3ec;--chipink:#346538}
-@media(prefers-color-scheme:dark){:root{--bg:#191919;--ink:#e9e8e4;--mute:#9b9a97;--line:#2e2e2c;--link:#7db7de;--chip:#243023;--chipink:#9fcca2}}
+TOPICS = [
+    ("Energy", r"\b(oil|gas\b|adnoc|energy|opec|solar|masdar|power|fuel|barrel|petrol|refiner)"),
+    ("Property", r"\b(propert|real estate|emaar|aldar|damac|tower|villa|apartment|developer|housing|rent|mortgage)"),
+    ("Startups", r"\b(startup|fintech|funding|raises|venture|seed round|series [abc]\b|unicorn|g42|ai\b)"),
+    ("Banking", r"\b(bank|loan|lender|credit|sukuk|bond|dirham|insur|interest rate|base rate|payment)"),
+    ("Markets", r"\b(stock|share|dfm|adx|index|ipo|listing|investor|equity|fund|dividend|profit|earning|market)"),
+    ("Trade", r"\b(trade|export|import|cargo|ports?\b|freight|logistic|airline|aviation|shipping|free zone|tourism|hotel|airport)"),
+]
+
+def tag(text):
+    for name, rx in TOPICS:
+        if re.search(rx, text, re.I):
+            return name
+    return "Business"
+
+CSS = """:root{--bg:#f7f6f3;--card:#fff;--ink:#1f1f1e;--mute:#787774;--line:#e4e2dd;--link:#1f6c9f;--acc:#0f5c4d}
+@media(prefers-color-scheme:dark){:root{--bg:#171716;--card:#1f1f1e;--ink:#ecebe7;--mute:#9b9a97;--line:#2e2e2c;--link:#7db7de;--acc:#5fc2a8}}
+.t-energy{--b:#fdebec;--c:#9f2f2d}.t-property{--b:#fbf3db;--c:#956400}.t-startups{--b:#efe8fa;--c:#5b3a99}
+.t-banking{--b:#e1f3fe;--c:#1f6c9f}.t-markets{--b:#edf3ec;--c:#346538}.t-trade{--b:#fdeee3;--c:#9a4d14}.t-business{--b:#eeede9;--c:#5c5b57}
+@media(prefers-color-scheme:dark){.t-energy{--b:#3a2223;--c:#f0a9a7}.t-property{--b:#38301a;--c:#e6c36b}.t-startups{--b:#2d2640;--c:#c3aef0}
+.t-banking{--b:#1d3040;--c:#8cc4ea}.t-markets{--b:#233023;--c:#9fcca2}.t-trade{--b:#3a2a1d;--c:#efb98c}.t-business{--b:#2a2a28;--c:#b9b8b3}}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "SF Pro Text","Helvetica Neue",system-ui,sans-serif}
-.wrap{max-width:720px;margin:0 auto;padding:28px 16px 56px}
-header{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:4px}
-h1{font:600 30px/1.1 "Newsreader","Lyon Text",Georgia,serif;letter-spacing:-.03em;margin:0 0 6px}
-.tag{margin:0;color:var(--mute);font-size:15px}
-.meta{margin:10px 0 0;color:var(--mute);font:12px/1.5 "SF Mono","Geist Mono",ui-monospace,monospace}
-article{padding:18px 0;border-bottom:1px solid var(--line)}
-h2{font:600 21px/1.28 "Newsreader","Lyon Text",Georgia,serif;letter-spacing:-.02em;margin:0 0 6px}
-h2 a{color:var(--ink);text-decoration:none}h2 a:hover{color:var(--link)}
-.by{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--mute);margin:0 0 6px}
-.by b{font-weight:600;color:var(--ink)}
-.n{background:var(--chip);color:var(--chipink);border-radius:9999px;padding:1px 8px;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
-.sum{margin:0 0 8px;color:var(--ink)}
+a{color:inherit}.wrap{max-width:1080px;margin:0 auto;padding:0 16px 56px}
+.top{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font:12px/1.4 "SF Mono","Geist Mono",ui-monospace,monospace;color:var(--mute)}
+.mast{padding:26px 0 18px}
+h1{font:700 40px/1 "Newsreader","Lyon Text",Georgia,serif;letter-spacing:-.035em;margin:0}
+h1 i{font-style:normal;color:var(--acc)}
+.tag{margin:8px 0 0;color:var(--mute);font-size:15px}
+.demo{background:#fbf3db;color:#956400;border-radius:8px;padding:8px 12px;font-size:13px;margin:0 0 14px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0;position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);z-index:2;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;font:600 13px/1 inherit;font-family:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9999px;padding:8px 14px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip small{opacity:.6;font-weight:500;margin-left:4px}
+.grid{display:block;padding-top:6px}
+article{padding:20px 0;border-bottom:1px solid var(--line)}article[hidden]{display:none}
+.kick{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--mute);margin:0 0 8px}
+.pill{background:var(--b);color:var(--c);border-radius:9999px;padding:2px 10px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.kick b{color:var(--ink);font-weight:600}
+h2{font:600 22px/1.25 "Newsreader","Lyon Text",Georgia,serif;letter-spacing:-.02em;margin:0 0 8px}
+h2 a{text-decoration:none}h2 a:hover{color:var(--link)}
+.sum{margin:0 0 10px}
 .more{margin:0;font-size:14px;color:var(--mute)}.more a{color:var(--link);text-decoration:none}.more a:hover{text-decoration:underline}
-.demo{background:#fbf3db;color:#956400;border-radius:8px;padding:8px 12px;font-size:13px;margin:14px 0 0}
+.n{font-size:12px;color:var(--mute)}
+.hero{padding:26px 0 28px}
+.hero h2{font-size:30px;line-height:1.15;letter-spacing:-.03em}
+.hero .sum{font-size:18px;line-height:1.55}
+aside{display:none}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
+.box h3{margin:0 0 12px;font:600 12px/1 inherit;font-family:inherit;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.box ol{margin:0;padding:0;list-style:none;counter-reset:r}
+.box li{counter-increment:r;display:grid;grid-template-columns:22px 1fr;gap:6px;padding:10px 0;border-top:1px solid var(--line);font-size:15px;line-height:1.35}
+.box li:first-child{border-top:0;padding-top:0}
+.box li:before{content:counter(r);font:600 13px/1.5 "SF Mono",ui-monospace,monospace;color:var(--acc)}
+.box li a{text-decoration:none}.box li a:hover{color:var(--link)}.box li span{display:block;font-size:12px;color:var(--mute);margin-top:2px}
+.box p{margin:0;font-size:14px;color:var(--mute)}
 footer{margin-top:28px;color:var(--mute);font-size:13px}footer a{color:var(--mute)}
-@media(min-width:640px){.wrap{padding-top:48px}h1{font-size:36px}h2{font-size:23px}}"""
+@media(min-width:900px){
+h1{font-size:56px}.mast{padding:40px 0 26px}.hero h2{font-size:40px}.hero .sum{font-size:19px}h2{font-size:24px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:56px}aside{display:block;padding-top:22px;position:sticky;top:64px;align-self:start}}"""
 
-JS = "document.querySelectorAll('time[datetime]').forEach(function(t){var m=(Date.now()-Date.parse(t.dateTime))/6e4;t.textContent=m<2?'just now':m<60?Math.round(m)+'m ago':m<1440?Math.round(m/60)+'h ago':Math.round(m/1440)+'d ago'})"
+JS = """var chips=document.querySelectorAll('.chip'),arts=document.querySelectorAll('article[data-t]');
+chips.forEach(function(c){c.addEventListener('click',function(){chips.forEach(function(x){x.setAttribute('aria-pressed',x===c?'true':'false')});arts.forEach(function(a){a.hidden=c.dataset.t!=='All'&&a.dataset.t!==c.dataset.t})})});
+document.querySelectorAll('time[datetime]').forEach(function(t){var m=(Date.now()-Date.parse(t.dateTime))/6e4;t.textContent=m<2?'just now':m<60?Math.round(m)+'m ago':m<1440?Math.round(m/60)+'h ago':Math.round(m/1440)+'d ago'})"""
 
 def ago(now, ts):
     m = (now - ts) / 60
@@ -348,26 +391,36 @@ def render(stories, health, now, demo):
     e = html.escape
     ok = sum(1 for h in health if h["status"] == "ok")
     outlets = {x["source"].lower() for s in stories for x in [s["lead"]] + s["more"]}
+    counts = Counter(s["topic"] for s in stories)
+    chips = f'<button class="chip" data-t="All" aria-pressed="true">All<small>{len(stories)}</small></button>' + "".join(
+        f'<button class="chip" data-t="{e(t)}" aria-pressed="false">{e(t)}<small>{c}</small></button>' for t, c in counts.most_common())
     body = []
-    for s in stories:
+    for i, s in enumerate(stories):
         l = s["lead"]
         more = ", ".join(f'<a href="{e(x["url"])}" rel="noopener">{e(x["source"])}</a>' for x in s["more"][:6])
         body.append(
-            f'<article><h2><a href="{e(l["url"])}" rel="noopener">{e(l["title"])}</a></h2>'
-            f'<p class="by"><b>{e(l["source"])}</b><time datetime="{datetime.fromtimestamp(s["ts"], timezone.utc).isoformat()}">{ago(now, s["ts"])}</time>'
+            f'<article class="{"hero" if i == 0 else ""}" data-t="{e(s["topic"])}">'
+            f'<p class="kick"><span class="pill t-{s["topic"].lower()}">{e(s["topic"])}</span><b>{e(l["source"])}</b>'
+            f'<time datetime="{datetime.fromtimestamp(s["ts"], timezone.utc).isoformat()}">{ago(now, s["ts"])}</time>'
             + (f'<span class="n">{s["n"]} outlets</span>' if s["n"] > 1 else "") + "</p>"
+            f'<h2><a href="{e(l["url"])}" rel="noopener">{e(l["title"])}</a></h2>'
             + (f'<p class="sum">{e(s["summary"])}</p>' if s.get("summary") else "")
             + (f'<p class="more">More: {more}</p>' if more else "") + "</article>")
-    stamp = datetime.fromtimestamp(now, GST).strftime("%d %b %Y, %H:%M GST")
+    top = sorted(stories, key=lambda s: (-s["n"], -s["ts"]))[:5]
+    side = "".join(f'<li><div><a href="{e(s["lead"]["url"])}" rel="noopener">{e(s["lead"]["title"])}</a><span>{s["n"]} outlet{"" if s["n"] == 1 else "s"} &middot; {e(s["topic"])}</span></div></li>' for s in top)
+    dt = datetime.fromtimestamp(now, GST)
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(SITE_NAME)}</title><meta name="description" content="{e(TAGLINE)}">
 <style>{CSS}</style></head><body><div class="wrap">
-<header><h1>{e(SITE_NAME)}</h1><p class="tag">{e(TAGLINE)}</p>
-<p class="meta">Updated {stamp} &middot; {len(stories)} stories &middot; {len(outlets)} outlets &middot; {ok} feeds live</p>
-{'<p class="demo">Demo data. These stories are fictional test fixtures, not real news.</p>' if demo else ''}</header>
-{''.join(body)}
-<footer><p>Headlines and links belong to their publishers. Blurbs are written by an AI from the headlines and can contain mistakes, so check the source. <a href="health.json">Feed health</a>.</p></footer>
+<div class="top"><span>{dt.strftime("%A, %d %B %Y")}</span><span>Updated {dt.strftime("%H:%M")} GST</span></div>
+<header class="mast"><h1>UAE Ledger<i>.</i></h1><p class="tag">{e(TAGLINE)}</p></header>
+{'<p class="demo">Demo data. These stories are fictional test fixtures, not real news.</p>' if demo else ''}
+<nav class="chips" aria-label="Topics">{chips}</nav>
+<div class="grid"><main>{''.join(body)}</main>
+<aside><div class="box"><h3>Most covered now</h3><ol>{side}</ol></div>
+<div class="box"><h3>About</h3><p>{len(stories)} stories from {len(outlets)} outlets, {ok} feeds live. Headlines and links belong to their publishers. Blurbs are written by an AI and can contain mistakes, so check the source. <a href="health.json">Feed health</a></p></div></aside></div>
+<footer><p>Headlines and links belong to their publishers. Blurbs are written by an AI and can contain mistakes.</p></footer>
 </div><script>{JS}</script></body></html>"""
 
 
