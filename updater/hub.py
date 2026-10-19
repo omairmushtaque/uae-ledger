@@ -3,7 +3,9 @@
 
 Standard library only. Run:  python3 updater/hub.py
 Needs ANTHROPIC_API_KEY for summaries; without it the page shows headlines only.
-What is stored/published: headline, link, outlet name, time, and our own summary.
+What is stored/published: headline, link, outlet name, time, our own summary, and the URL
+of one picture per story (never the picture file). Pictures are hotlinked from the publisher
+and link back to the article. Set HUB_PHOTOS=0 to turn pictures off.
 Feed snippets are used as summarizer input in memory and are never saved or shown.
 """
 import argparse, hashlib, html, json, math, os, re, ssl, sys, time, urllib.parse, urllib.request
@@ -67,6 +69,27 @@ def parse_date(s):
 def ln(tag):
     return tag.rsplit("}", 1)[-1].lower()
 
+def host(u):
+    h = urllib.parse.urlsplit(u).netloc.lower().split(":")[0]
+    return h[4:] if h.startswith("www.") else h
+
+def real_domain(d):
+    """Outlet domain for the logo. Google/Bing redirect links are not the outlet, so no logo lookup."""
+    return "" if re.search(r"(^|\.)(google\.[a-z.]+|bing\.com)$", d) else d
+
+IMG_EXT = re.compile(r"\.(jpe?g|png|webp|gif|avif)(\?|$)", re.I)
+
+def clean_img(u, base=""):
+    """Only https image URLs are kept (an https page cannot show http images)."""
+    u = html.unescape((u or "").strip())
+    if u and base:
+        u = urllib.parse.urljoin(base, u)
+    if u.startswith("//"):
+        u = "https:" + u
+    if u.startswith("http://"):
+        u = "https://" + u[7:]
+    return u if u.startswith("https://") and len(u) <= 600 and " " not in u else ""
+
 
 # ---------- 1. collect ----------
 def fetch_raw(url, base):
@@ -88,7 +111,7 @@ def parse_items(raw, feed):
     items = []
     if feed.get("type") == "gdelt":
         for a in json.loads(raw).get("articles", []):
-            items.append(dict(title=a.get("title", ""), url=a.get("url", ""), src=a.get("domain", ""), date=a.get("seendate"), snippet=""))
+            items.append(dict(title=a.get("title", ""), url=a.get("url", ""), src=a.get("domain", ""), date=a.get("seendate"), snippet="", dom=a.get("domain", ""), img=""))
         return items
     root = ET.fromstring(raw.lstrip())
     for el in root.iter():
@@ -97,14 +120,27 @@ def parse_items(raw, feed):
         d = {}
         for c in el:
             k = ln(c.tag)
+            u = (c.get("url") or "").strip()
+            if k in ("thumbnail", "content", "enclosure") and u:          # picture the publisher put in its own feed
+                if "img" not in d and (k == "thumbnail" or (c.get("type") or c.get("medium") or "").startswith("image") or IMG_EXT.search(u)):
+                    d["img"] = u
+                continue
+            if k == "source" and u:                                         # Google News: the real outlet's address
+                d["srcurl"] = u
             if k == "link" and c.get("href"):
                 if c.get("rel", "alternate") == "alternate" and "link" not in d:
                     d["link"] = c.get("href")
             elif k not in d:
                 d[k] = (c.text or "").strip()
+        body = d.get("description") or d.get("summary") or ""
+        img = d.get("img")
+        if not img and not feed.get("outlet_from_source"):
+            m = re.search(r"<img[^>]+src=[\"']([^\"']+)", body, re.I)
+            img = m.group(1) if m else ""
         items.append(dict(title=d.get("title", ""), url=d.get("link", ""), src=d.get("source", ""),
                           date=d.get("pubdate") or d.get("published") or d.get("updated") or d.get("date"),
-                          snippet="" if feed.get("outlet_from_source") else d.get("description") or d.get("summary") or ""))
+                          snippet="" if feed.get("outlet_from_source") else body,
+                          dom=host(d["srcurl"]) if d.get("srcurl") else "", img=clean_img(img, d.get("link", ""))))
     return items
 
 def collect_one(feed, base, now):
@@ -132,7 +168,8 @@ def collect_one(feed, base, now):
             snippet = clean(it["snippet"])[:300]
             if feed.get("filter") and not (UAE_RE.search(title + " " + snippet) and BIZ_RE.search(title + " " + snippet)):
                 continue
-            out.append(dict(title=title, url=url, source=src, ts=ts, snippet=snippet, feed=feed["name"]))
+            out.append(dict(title=title, url=url, source=src, ts=ts, snippet=snippet, feed=feed["name"],
+                            img=it.get("img", ""), dom=real_domain(it.get("dom") or host(url))))
         h["kept"] = len(out)
         if newest is not None:
             h["newest_h"] = round((now - newest) / 3600, 1)
@@ -217,10 +254,13 @@ def make_story(c, weights, now):
     w = lambda m: weights.get(m["source"].lower(), 1)
     lead = max(ms, key=lambda m: (w(m), -m["ts"]))
     first = min(c, key=lambda m: m["ts"])
-    pick = lambda m: dict(title=m["title"], url=m["url"], source=m["source"])
+    pick = lambda m: dict(title=m["title"], url=m["url"], source=m["source"], dom=m.get("dom", ""))
+    others = sorted((m for m in ms if m is not lead), key=lambda m: -w(m))
+    withimg = next((m for m in [lead] + others if m.get("img")), None)   # lead's picture first, else the best-ranked outlet that has one
+    pic = dict(img=withimg["img"], url=withimg["url"], source=withimg["source"]) if withimg else None
     age_h = (now - max(m["ts"] for m in c)) / 3600
-    return dict(id=hashlib.sha1(canon(first["url"]).encode()).hexdigest()[:10], lead=pick(lead),
-                more=[pick(m) for m in sorted((m for m in ms if m is not lead), key=lambda m: -w(m))],
+    return dict(id=hashlib.sha1(canon(first["url"]).encode()).hexdigest()[:10], lead=pick(lead), pic=pic,
+                more=[pick(m) for m in others],
                 ts=max(m["ts"] for m in c), n=len(ms), topic=tag(" ".join(m["title"] for m in c)), score=len(ms) * 1.5 + 6 * math.exp(-age_h / 10),
                 _titles=[m["title"] for m in c], _snips=[m["snippet"] for m in c if m["snippet"]])
 
@@ -290,6 +330,45 @@ def summarize(stories, cache, key, model):
         s["summary"] = cache.get(s["id"], {}).get("text", "")
 
 
+# ---------- 3b. pictures for stories whose feed had none ----------
+OG_RE = re.compile(r"<meta[^>]+(?:property|name)=[\"'](?:og:image(?::secure_url)?|twitter:image)[\"'][^>]*>", re.I)
+
+def og_image(page, base):
+    for t in OG_RE.findall(page):
+        m = re.search(r"content=[\"']([^\"']+)", t, re.I)
+        if m and clean_img(m.group(1), base):
+            return clean_img(m.group(1), base)
+    return ""
+
+def fetch_og(url):
+    """The publisher's own share image (og:image). Returns None on a network error so we retry next run."""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html"})
+        with urllib.request.urlopen(req, timeout=8, context=ssl.create_default_context()) as r:
+            return og_image(r.read(250_000).decode("utf-8", "ignore"), url)
+    except Exception:
+        return None
+
+def add_images(stories, cache, now):
+    """Only the image URL is stored (in the same cache file, keys start with 'img:'), never the picture."""
+    todo = []
+    for s in stories:
+        if s["pic"] or not s["lead"].get("dom"):          # no dom = Google/Bing redirect link, nothing to open
+            continue
+        hit = cache.get("img:" + canon(s["lead"]["url"]))
+        if hit is None:
+            todo.append(s)
+        elif hit["text"]:
+            s["pic"] = dict(img=hit["text"], url=s["lead"]["url"], source=s["lead"]["source"])
+    with ThreadPoolExecutor(6) as ex:
+        for s, u in zip(todo, ex.map(lambda s: fetch_og(s["lead"]["url"]), todo)):
+            if u is None:
+                continue
+            cache["img:" + canon(s["lead"]["url"])] = {"text": u, "ts": now}
+            if u:
+                s["pic"] = dict(img=u, url=s["lead"]["url"], source=s["lead"]["source"])
+
+
 # ---------- 4. checks ----------
 def check_stories(stories):
     errs, urls = [], Counter()
@@ -334,9 +413,9 @@ def tag(text):
 
 CSS = """:root{--bg:#f7f6f3;--card:#fff;--ink:#1f1f1e;--mute:#787774;--line:#e4e2dd;--link:#1f6c9f;--acc:#0f5c4d}
 @media(prefers-color-scheme:dark){:root{--bg:#171716;--card:#1f1f1e;--ink:#ecebe7;--mute:#9b9a97;--line:#2e2e2c;--link:#7db7de;--acc:#5fc2a8}}
-.t-energy{--b:#fdebec;--c:#9f2f2d}.t-property{--b:#fbf3db;--c:#956400}.t-startups{--b:#efe8fa;--c:#5b3a99}
-.t-banking{--b:#e1f3fe;--c:#1f6c9f}.t-markets{--b:#edf3ec;--c:#346538}.t-trade{--b:#fdeee3;--c:#9a4d14}.t-business{--b:#eeede9;--c:#5c5b57}
-@media(prefers-color-scheme:dark){.t-energy{--b:#3a2223;--c:#f0a9a7}.t-property{--b:#38301a;--c:#e6c36b}.t-startups{--b:#2d2640;--c:#c3aef0}
+.t-energy{--b:#fdebec;--c:#9f2f2d;--s:#d6362e}.t-property{--b:#dff5f6;--c:#0b6b78;--s:#0c8599}.t-startups{--b:#efe8fa;--c:#5b3a99;--s:#7048e8}
+.t-banking{--b:#e1f3fe;--c:#1f6c9f;--s:#1c7ed6}.t-markets{--b:#edf3ec;--c:#346538;--s:#2f9e44}.t-trade{--b:#fdeee3;--c:#9a4d14;--s:#f08c00}.t-business{--b:#eeede9;--c:#5c5b57;--s:#495057}
+@media(prefers-color-scheme:dark){.t-energy{--b:#3a2223;--c:#f0a9a7}.t-property{--b:#17343a;--c:#7fd3de}.t-startups{--b:#2d2640;--c:#c3aef0}
 .t-banking{--b:#1d3040;--c:#8cc4ea}.t-markets{--b:#233023;--c:#9fcca2}.t-trade{--b:#3a2a1d;--c:#efb98c}.t-business{--b:#2a2a28;--c:#b9b8b3}}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "SF Pro Text","Helvetica Neue",system-ui,sans-serif}
@@ -352,8 +431,20 @@ h1 i{font-style:normal;color:var(--acc)}
 .chip{flex:none;font:600 13px/1 inherit;font-family:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9999px;padding:8px 14px;cursor:pointer}
 .chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .chip small{opacity:.6;font-weight:500;margin-left:4px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--s);margin-right:7px}
+.bar{display:flex;height:4px;border-radius:4px;overflow:hidden;margin-top:18px}.bar i{flex:1;background:var(--s)}
 .grid{display:block;padding-top:6px}
-article{padding:20px 0;border-bottom:1px solid var(--line)}article[hidden]{display:none}
+article{display:grid;grid-template-columns:minmax(0,1fr) 108px;gap:0 16px;align-items:start;padding:20px 0;border-bottom:1px solid var(--line)}article[hidden]{display:none}
+.txt{min-width:0}
+.pic{position:relative;display:block;width:108px;aspect-ratio:4/3;overflow:hidden;border-radius:10px;background:var(--s);color:#fff;margin-top:4px}
+.pic:before,.pic:after{content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.13)}
+.pic:before{width:74%;aspect-ratio:1;right:-20%;top:-34%}.pic:after{width:46%;aspect-ratio:1;left:-12%;bottom:-30%}
+.ic{position:absolute;inset:0;display:grid;place-items:center}.ic svg{width:36%;max-width:60px}
+.pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.src{display:inline-flex;align-items:center;gap:6px}
+.lg{position:relative;flex:none;width:18px;height:18px;border-radius:5px;overflow:hidden;display:grid;place-items:center;font:700 11px/1 "Helvetica Neue",system-ui,sans-serif;background:hsl(var(--h) 55% 42%);color:#fff}
+.lg img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff}
+.fav{width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:4px}
 .kick{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--mute);margin:0 0 8px}
 .pill{background:var(--b);color:var(--c);border-radius:9999px;padding:2px 10px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
 .kick b{color:var(--ink);font-weight:600}
@@ -362,7 +453,8 @@ h2 a{text-decoration:none}h2 a:hover{color:var(--link)}
 .sum{margin:0 0 10px}
 .more{margin:0;font-size:14px;color:var(--mute)}.more a{color:var(--link);text-decoration:none}.more a:hover{text-decoration:underline}
 .n{font-size:12px;color:var(--mute)}
-.hero{padding:26px 0 28px}
+.hero{display:block;padding:22px 0 28px}
+.hero .pic{width:100%;aspect-ratio:16/9;border-radius:14px;margin:0 0 16px}.hero .ic svg{width:22%;max-width:96px}
 .hero h2{font-size:30px;line-height:1.15;letter-spacing:-.03em}
 .hero .sum{font-size:18px;line-height:1.55}
 aside{display:none}
@@ -371,10 +463,11 @@ aside{display:none}
 .box ol{margin:0;padding:0;list-style:none;counter-reset:r}
 .box li{counter-increment:r;display:grid;grid-template-columns:22px 1fr;gap:6px;padding:10px 0;border-top:1px solid var(--line);font-size:15px;line-height:1.35}
 .box li:first-child{border-top:0;padding-top:0}
-.box li:before{content:counter(r);font:600 13px/1.5 "SF Mono",ui-monospace,monospace;color:var(--acc)}
+.box li:before{content:counter(r);font:700 13px/1.5 "SF Mono",ui-monospace,monospace;color:var(--s,var(--acc))}
 .box li a{text-decoration:none}.box li a:hover{color:var(--link)}.box li span{display:block;font-size:12px;color:var(--mute);margin-top:2px}
 .box p{margin:0;font-size:14px;color:var(--mute)}
 footer{margin-top:28px;color:var(--mute);font-size:13px}footer a{color:var(--mute)}
+@media(min-width:600px){article{grid-template-columns:minmax(0,1fr) 172px;gap:0 22px}.pic{width:172px}.hero{display:block}.hero .pic{width:100%}}
 @media(min-width:900px){
 h1{font-size:56px}.mast{padding:40px 0 26px}.hero h2{font-size:40px}.hero .sum{font-size:19px}h2{font-size:24px}
 .grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:56px}aside{display:block;padding-top:22px;position:sticky;top:64px;align-self:start}}"""
@@ -387,40 +480,73 @@ def ago(now, ts):
     m = (now - ts) / 60
     return "just now" if m < 2 else f"{int(m)}m ago" if m < 60 else f"{int(m / 60)}h ago" if m < 1440 else f"{int(m / 1440)}d ago"
 
+ICONS = {   # simple line icons (24x24), drawn for this page
+    "Energy": "M13 2 4 14h7l-1 8 9-12h-7z",
+    "Property": "M4 21V5l8-3 8 3v16M9 9h2M13 9h2M9 13h2M13 13h2M10 21v-4h4v4",
+    "Startups": "M12 2l2.5 6.5L21 11l-6.5 2.5L12 20l-2.5-6.5L3 11l6.5-2.5z",
+    "Banking": "M3 10 12 4l9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 21h18",
+    "Markets": "M3 17l6-6 4 4 8-8M15 7h6v6",
+    "Trade": "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18",
+    "Business": "M3 8h18v12H3zM9 8V5h6v3M3 13h18",
+}
+FAVICON = "https://www.google.com/s2/favicons?sz=64&amp;domain="
+
+def icon(topic):
+    return f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{ICONS.get(topic, ICONS["Business"])}"/></svg>'
+
+def logo(name, dom):
+    """Outlet badge: a coloured letter, with the outlet's favicon laid over it when one loads."""
+    e = html.escape
+    hue = int(hashlib.sha1(name.lower().encode()).hexdigest()[:4], 16) % 360
+    img = f'<img src="{FAVICON}{e(dom)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' if dom else ""
+    return f'<span class="lg" style="--h:{hue}">{e(name[:1].upper())}{img}</span>'
+
+def pic_html(s, hero):
+    """Always a coloured topic tile; the publisher's picture sits on top of it when there is one."""
+    e = html.escape
+    p = s.get("pic")
+    img = (f'<img src="{e(p["img"])}" alt="" loading="{"eager" if hero else "lazy"}" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">' if p else "")
+    href = p["url"] if p else s["lead"]["url"]
+    title = f' title="Photo via {e(p["source"])}"' if p else ""
+    return f'<a class="pic t-{s["topic"].lower()}" href="{e(href)}" rel="noopener" tabindex="-1" aria-hidden="true"{title}><span class="ic">{icon(s["topic"])}</span>{img}</a>'
+
 def render(stories, health, now, demo):
     e = html.escape
     ok = sum(1 for h in health if h["status"] == "ok")
     outlets = {x["source"].lower() for s in stories for x in [s["lead"]] + s["more"]}
     counts = Counter(s["topic"] for s in stories)
     chips = f'<button class="chip" data-t="All" aria-pressed="true">All<small>{len(stories)}</small></button>' + "".join(
-        f'<button class="chip" data-t="{e(t)}" aria-pressed="false">{e(t)}<small>{c}</small></button>' for t, c in counts.most_common())
+        f'<button class="chip" data-t="{e(t)}" aria-pressed="false"><i class="dot t-{t.lower()}"></i>{e(t)}<small>{c}</small></button>' for t, c in counts.most_common())
     body = []
     for i, s in enumerate(stories):
         l = s["lead"]
-        more = ", ".join(f'<a href="{e(x["url"])}" rel="noopener">{e(x["source"])}</a>' for x in s["more"][:6])
-        body.append(
-            f'<article class="{"hero" if i == 0 else ""}" data-t="{e(s["topic"])}">'
-            f'<p class="kick"><span class="pill t-{s["topic"].lower()}">{e(s["topic"])}</span><b>{e(l["source"])}</b>'
-            f'<time datetime="{datetime.fromtimestamp(s["ts"], timezone.utc).isoformat()}">{ago(now, s["ts"])}</time>'
-            + (f'<span class="n">{s["n"]} outlets</span>' if s["n"] > 1 else "") + "</p>"
-            f'<h2><a href="{e(l["url"])}" rel="noopener">{e(l["title"])}</a></h2>'
-            + (f'<p class="sum">{e(s["summary"])}</p>' if s.get("summary") else "")
-            + (f'<p class="more">More: {more}</p>' if more else "") + "</article>")
+        fav = lambda x: f'<img class="fav" src="{FAVICON}{e(x["dom"])}" alt="" width="14" height="14" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' if x.get("dom") else ""
+        more = ", ".join(f'<a href="{e(x["url"])}" rel="noopener">{fav(x)}{e(x["source"])}</a>' for x in s["more"][:6])
+        txt = (f'<div class="txt"><p class="kick"><span class="pill t-{s["topic"].lower()}">{e(s["topic"])}</span>'
+               f'<span class="src">{logo(l["source"], l.get("dom", ""))}<b>{e(l["source"])}</b></span>'
+               f'<time datetime="{datetime.fromtimestamp(s["ts"], timezone.utc).isoformat()}">{ago(now, s["ts"])}</time>'
+               + (f'<span class="n">{s["n"]} outlets</span>' if s["n"] > 1 else "") + "</p>"
+               f'<h2><a href="{e(l["url"])}" rel="noopener">{e(l["title"])}</a></h2>'
+               + (f'<p class="sum">{e(s["summary"])}</p>' if s.get("summary") else "")
+               + (f'<p class="more">More: {more}</p>' if more else "") + "</div>")
+        pic = pic_html(s, i == 0)
+        body.append(f'<article class="{"hero" if i == 0 else ""}" data-t="{e(s["topic"])}">' + (pic + txt if i == 0 else txt + pic) + "</article>")
     top = sorted(stories, key=lambda s: (-s["n"], -s["ts"]))[:5]
-    side = "".join(f'<li><div><a href="{e(s["lead"]["url"])}" rel="noopener">{e(s["lead"]["title"])}</a><span>{s["n"]} outlet{"" if s["n"] == 1 else "s"} &middot; {e(s["topic"])}</span></div></li>' for s in top)
+    side = "".join(f'<li class="t-{s["topic"].lower()}"><div><a href="{e(s["lead"]["url"])}" rel="noopener">{e(s["lead"]["title"])}</a><span>{s["n"]} outlet{"" if s["n"] == 1 else "s"} &middot; {e(s["topic"])}</span></div></li>' for s in top)
+    bar = "".join(f'<i class="t-{t.lower()}"></i>' for t in ICONS)
     dt = datetime.fromtimestamp(now, GST)
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(SITE_NAME)}</title><meta name="description" content="{e(TAGLINE)}">
 <style>{CSS}</style></head><body><div class="wrap">
 <div class="top"><span>{dt.strftime("%A, %d %B %Y")}</span><span>Updated {dt.strftime("%H:%M")} GST</span></div>
-<header class="mast"><h1>UAE Ledger<i>.</i></h1><p class="tag">{e(TAGLINE)}</p></header>
+<header class="mast"><h1>UAE Ledger<i>.</i></h1><p class="tag">{e(TAGLINE)}</p><div class="bar" aria-hidden="true">{bar}</div></header>
 {'<p class="demo">Demo data. These stories are fictional test fixtures, not real news.</p>' if demo else ''}
 <nav class="chips" aria-label="Topics">{chips}</nav>
 <div class="grid"><main>{''.join(body)}</main>
 <aside><div class="box"><h3>Most covered now</h3><ol>{side}</ol></div>
-<div class="box"><h3>About</h3><p>{len(stories)} stories from {len(outlets)} outlets, {ok} feeds live. Headlines and links belong to their publishers. Blurbs are written by an AI and can contain mistakes, so check the source. <a href="health.json">Feed health</a></p></div></aside></div>
-<footer><p>Headlines and links belong to their publishers. Blurbs are written by an AI and can contain mistakes.</p></footer>
+<div class="box"><h3>About</h3><p>{len(stories)} stories from {len(outlets)} outlets, {ok} feeds live. Headlines, links, pictures and logos belong to their publishers; pictures load from their sites and open the story. Blurbs are written by an AI and can contain mistakes, so check the source. <a href="health.json">Feed health</a></p></div></aside></div>
+<footer><p>Headlines, links, pictures and logos belong to their publishers. Blurbs are written by an AI and can contain mistakes.</p></footer>
 </div><script>{JS}</script></body></html>"""
 
 
@@ -451,6 +577,11 @@ def main():
     if not key:
         print("No ANTHROPIC_API_KEY: showing cached blurbs only, headlines for the rest.")
     summarize(stories, cache, key, os.environ.get("SUMMARY_MODEL", "claude-haiku-5-5"))
+    if os.environ.get("HUB_PHOTOS") == "0":
+        for s in stories:
+            s["pic"] = None
+    elif not a.demo:
+        add_images(stories, cache, now)
 
     errs = check_stories(stories)
     if ok < a.min_feeds:
